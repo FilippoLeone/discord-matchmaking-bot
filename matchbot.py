@@ -8,7 +8,7 @@ import string
 intents = discord.Intents.all()  # Create instance of all Intents
 bot = commands.Bot(command_prefix='!', intents=intents)  # Define bot and prefix
 
-custom_role_name = 'gamer'  # Define custom role name that will be assigned when creating the teams, please create it beforehand
+custom_role_name = 'gamer'  # Define custom role name
 sessions = {}  # Sessions dictionary
 
 @bot.event
@@ -45,10 +45,11 @@ async def create_teams(ctx, lobby_channel_name: str, max_teams: int, team_size: 
     for i in range(1, max_teams + 1):
         uid = ''.join(random.choices(string.ascii_lowercase + string.digits, k=5))
         team_category = await ctx.guild.create_category(f'Team {i}-{uid}')
+        
         team_members = members[(i-1)*team_size:i*team_size]
 
         # Store the user context of all members who have joined the team in the session
-        sessions[session_id][i] = {member.id: {'member': member, 'team_category': team_category} for member in team_members}
+        sessions[session_id][i] = {member.id: {'member': member, 'team_category': team_category, 'team_text_channel': f'team-{i}-{uid}-text'} for member in team_members}
 
         overwrites = {
             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -56,7 +57,6 @@ async def create_teams(ctx, lobby_channel_name: str, max_teams: int, team_size: 
         }
         for member in team_members:
             overwrites[member] = discord.PermissionOverwrite(read_messages=True)
-
         text_channel = await team_category.create_text_channel(f'team-{i}-{uid}-text', overwrites=overwrites)
         voice_channel = await team_category.create_voice_channel(f'team-{i}-{uid}-voice', overwrites=overwrites)
 
@@ -87,12 +87,23 @@ async def check_if_empty_and_delete(text_channel, voice_channel, category, sessi
             break
 
 @bot.command()
-async def send_to_teams(ctx, *, message):
-    """Command to send a message to all team's text channels."""
-    for channel in ctx.guild.text_channels:
-        if channel.name.startswith('team-'):
-            await channel.send(message)
-    await ctx.send('Message broadcasted to all teams.')
+async def send_to_teams(ctx, session_number: str, *, message):
+    """Command to send a message to a specific session's team text channels."""
+    session = sessions.get(session_number)
+    if session is None:
+        await ctx.send(f'Session {session_number} does not exist.')
+        return
+
+    for team_data in session.values():
+        for member_id, member_data in team_data.items():
+            member = member_data['member']
+            channel_name = member_data['team_text_channel']
+            channel = discord.utils.get(member_data['team_category'].text_channels, name=channel_name)
+            if channel:
+                await channel.send(f'{member.mention}: {message}')
+
+    await ctx.send(f'Message broadcasted to all teams in session {session_number}.')
+
 
 @bot.command()
 async def send_to_session(ctx, session_id: str, *, message: str):
