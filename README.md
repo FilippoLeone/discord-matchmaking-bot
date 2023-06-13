@@ -17,7 +17,7 @@ Once the bot is running on your server, you can use the following commands:
 
 2. `!create_teams [lobby_channel_name] [max_teams] [team_size]`: Creates a specified number of teams from the members present in the lobby. Each team will have its own text and voice channel.
 
-3. `!send_to_teams [message]`: Broadcasts a message to all team's text channels.
+3. `!send_to_teams [session_number] [message]`: Sends a message to the text channel of each team in a specific session.
 
 4. `!send_to_session [session_id] [message]`: Sends a private message to all members in a specific session.
 
@@ -35,12 +35,12 @@ The bot creates a role called 'gamer' for members who join the lobby. It sets th
 
 ### Sessions
 
-The bot uses a dictionary to keep track of all sessions. Each session has a unique ID, and contains a dictionary for each team. The team dictionary maps each member's ID to a context object, which contains the member and their team's category.
+The bot uses a dictionary to keep track of all sessions. Each session has a unique ID and contains a dictionary for each team. The team dictionary maps each member's ID to a context object, which contains the member and their team's category.
 
 ### Channel Cleanup
 
-The bot periodically checks if a team's voice channel is empty. If it is, it deletes the team's text and voice channels, and the team's category if there are no more channels in it. If there are no more teams in a session, it deletes the session.
+The bot periodically checks if a team's voice channel is empty. If it is, it deletes the team's text and voice channels and the team's category if there are no more channels in it. If there are no more teams in a session, it deletes the session.
 
 ## Note
 
-This bot does not manage game servers or integration with any specific game. It is purely for managing teams and sessions within Discord. Any integration with a game server or API would need to be added separately.
+This bot does not manage game servers or integrate with any specific game. It is purely for managing teams and sessions within Discord. Any integration with a game server or API would need to be added separately.
