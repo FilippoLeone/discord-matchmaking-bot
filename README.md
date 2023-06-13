@@ -23,6 +23,16 @@ Once the bot is running on your server, you can use the following commands:
 
 5. `!get_sessions`: Lists all active session IDs.
 
+6. `!schedule_autostart [lobby_channel_name] [min_max_teams] [min_max_team_size] [time_to_wait] [keep_autostart]`: Schedules automatic team creation when a minimum number of players is reached in the lobby.
+
+7. `!stop_autostart [lobby_channel_name]`: Stops the scheduled autostart for a specific lobby.
+
+8. `!stop_all_autostarts`: Stops all scheduled autostarts.
+
+9. `!help`: List all commands.
+
+10. `!help [command_name]`: Gives you specific information about the command. 
+
 ## Permissions
 
 The bot requires the following permissions:
