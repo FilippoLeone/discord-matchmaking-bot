@@ -17,7 +17,7 @@ Once the bot is running on your server, you can use the following commands:
 
 2. `!create_teams [lobby_channel_name] [max_teams] [team_size]`: Creates a specified number of teams from the members present in the lobby. Each team will have its own text and voice channel.
 
-3. `!send_to_teams [session_number] [message]`: Sends a message to the text channel of each team in a specific session.
+3. `!send_to_teams [session_id] [message]`: Sends a message to the text channel of each team in a specific session.
 
 4. `!send_to_session [session_id] [message]`: Sends a private message to all members in a specific session.
 
