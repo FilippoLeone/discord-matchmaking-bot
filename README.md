@@ -35,7 +35,7 @@ Once the bot is running on your server, you can use the following commands:
 
 ## Example Usage
 
-`!schedule_autostart queue-channel 3/5 2/3 5 custom-lobby-password-here "Good luck in your custom game!"`
+`!schedule_autostart queue-channel 3/5 2/3 5 "To join the game use: custom-lobby-password" "Good luck in your custom game!"`
 
 ## Permissions
 
