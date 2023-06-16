@@ -4,6 +4,7 @@ from discord.utils import get
 import asyncio
 import random
 import string
+import trueskill
 
 intents = discord.Intents.all()  # Create instance of all Intents
 bot = commands.Bot(command_prefix='!', intents=intents)  # Define bot and prefix
@@ -66,6 +67,7 @@ async def create_teams(ctx, lobby_channel_name: str, max_teams: int, team_size: 
 
         print(f'Team {i} created with members: {team_members}.')
         bot.loop.create_task(check_if_empty_and_delete(text_channel, voice_channel, team_category, session_id, i))  # Delete if empty
+    return f"{session_id}"
 
 async def check_if_empty_and_delete(text_channel, voice_channel, category, session_id, team_id):
     """Check if a channel is empty and delete it."""
@@ -84,11 +86,11 @@ async def check_if_empty_and_delete(text_channel, voice_channel, category, sessi
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def send_to_teams(ctx, session_number: str, *, message):
+async def send_to_teams(ctx, session: str, message: str):
     """Command to send a message to a specific session's team text channels."""
-    session = sessions.get(session_number)
+    session = sessions.get(session)
     if session is None:
-        await ctx.send(f'Session {session_number} does not exist.')
+        await ctx.send(f'Session {session} does not exist.')
         return
 
     for team_data in session.values():
@@ -99,27 +101,27 @@ async def send_to_teams(ctx, session_number: str, *, message):
             if channel:
                 await channel.send(f'{member.mention}: {message}')
 
-    await ctx.send(f'Message broadcasted to all teams in session {session_number}.')
+    await ctx.send(f'Message broadcasted to all teams in session.')
 
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def send_to_session(ctx, session_id: str, *, message: str):
+async def send_to_session(ctx, session: str, message: str):
     """Command to send a message to all members in a session."""
-    session = sessions.get(session_id)
+    session = sessions.get(session)
     if session is None:
-        await ctx.send(f'Session {session_id} does not exist.')
+        await ctx.send(f'Session {session} does not exist.')
         return
     for team in session.values():
         for member in team.values():
             await member['member'].send(message)
-    await ctx.send(f'Message sent to all members in session {session_id}!')
+    await ctx.send(f'Message sent to all members in session!')
 
 autostart_tasks = {}  # A dictionary to store autostart tasks
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def schedule_autostart(ctx, lobby_channel_name: str, min_max_teams: str, min_max_team_size: str, time_to_wait: int, keep_autostart: bool = False):
+async def schedule_autostart(ctx, lobby_channel_name: str, min_max_teams: str, min_max_team_size: str, time_to_wait: int, start_message: str, private_message: str, keep_autostart: bool = False):
     min_teams, max_teams = map(int, min_max_teams.split("/"))
     min_team_size, max_team_size = map(int, min_max_team_size.split("/"))
     
@@ -129,15 +131,15 @@ async def schedule_autostart(ctx, lobby_channel_name: str, min_max_teams: str, m
         await ctx.invoke(bot.get_command('create_lobby'), lobby_channel_name=lobby_channel_name)
         lobby_channel = get(ctx.guild.voice_channels, name=lobby_channel_name)
 
-    await ctx.send(f'Scheduled autostart activated for {lobby_channel_name}. Waiting for players...')
+    await ctx.send(f'Scheduled autostart activated for {lobby_channel_name}.')
 
-    # Create the autostart task
-    autostart_task = bot.loop.create_task(run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size, max_team_size, time_to_wait, keep_autostart))
+    # Schedule the autostart
+    autostart_task = bot.loop.create_task(run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size, max_team_size, time_to_wait, start_message, private_message, keep_autostart))
 
-    # Store the task in the dictionary using the lobby name as the key
+    # Store the task in the dictionary using the lobby channel name as the key
     autostart_tasks[lobby_channel_name] = autostart_task
 
-async def run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size, max_team_size, time_to_wait, keep_autostart):
+async def run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size, max_team_size, time_to_wait, start_message, private_message, keep_autostart):
     game_in_progress = False
     while True:  # keep running until keep_autostart is set to False
         await asyncio.sleep(1)  # Check every second
@@ -146,7 +148,13 @@ async def run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size,
             if len(lobby_channel.members) >= max_team_size * max_teams:
                 print(f'Maximum player count reached in {lobby_channel.name}. Starting the game...')
                 await ctx.send(f'Maximum player count reached. Starting the game...')
-                await ctx.invoke(bot.get_command('create_teams'), lobby_channel_name=lobby_channel.name, max_teams=max_teams, team_size=max_team_size)
+                create_teams_command = bot.get_command('create_teams')
+                session_id = await create_teams_command.callback(ctx, lobby_channel_name=lobby_channel.name, max_teams=max_teams, team_size=max_team_size)
+                if session_id:  # Check that session_id is not None
+                    await asyncio.sleep(10)
+                    await ctx.send(f'Sending messages to session_id {session_id}.')
+                    await ctx.invoke(bot.get_command('send_to_teams'), session_id, start_message)  # Send the start message
+                    await ctx.invoke(bot.get_command('send_to_session'), session_id, private_message)  # Send the start message
                 game_in_progress = True
             else:
                 print(f'Minimum player count reached in {lobby_channel.name}. Waiting for {time_to_wait} minute(s)...')
@@ -154,8 +162,15 @@ async def run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size,
                 await asyncio.sleep(time_to_wait * 60)  # wait for specified minutes after reaching minimum players
                 print(f'Timeout reached in {lobby_channel.name}. Starting the game...')
                 await ctx.send(f'Starting the game...')
-                await ctx.invoke(bot.get_command('create_teams'), lobby_channel_name=lobby_channel.name, max_teams=min(len(lobby_channel.members)//min_team_size, max_teams), team_size=min_team_size)
+                create_teams_command = bot.get_command('create_teams')
+                session_id = await create_teams_command.callback(ctx, lobby_channel_name=lobby_channel.name, max_teams=max_teams, team_size=max_team_size)
+                if session_id:  # Check that session_id is not None
+                    await asyncio.sleep(10)
+                    await ctx.send(f'Sending messages to session_id {session_id}.')
+                    await ctx.invoke(bot.get_command('send_to_teams'), session_id, start_message)  # Send the start message
+                    await ctx.invoke(bot.get_command('send_to_session'), session_id, private_message)  # Send the start message
                 game_in_progress = True
+
         elif game_in_progress:
             if not keep_autostart:
                 break  # break the outer loop if keep_autostart is False
@@ -163,6 +178,8 @@ async def run_autostart(ctx, lobby_channel, min_teams, max_teams, min_team_size,
             # Clear lobby and start again
             lobby_channel = get(ctx.guild.voice_channels, name=lobby_channel.name)
             game_in_progress = False
+
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -192,5 +209,5 @@ async def get_sessions(ctx):
         await ctx.send("No active sessions.")
     else:
         await ctx.send("Active session IDs: " + ", ".join(sessions.keys()))
-        
+
 bot.run('your-token')
